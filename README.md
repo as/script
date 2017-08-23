@@ -1,0 +1,1 @@
+# Repository of one line scripts for various things
