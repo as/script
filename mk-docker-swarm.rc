@@ -1,0 +1,76 @@
+#!/bin/rc
+# This rc script generates commands to create an N-node raft consensus quorum;
+# along with a fault tolerant docker swarm. Feel free to use or modify this script;
+# if you know what you're doing. It assumes an internal network not exposed to the;
+# elements; Contact me directly for the ssl version;
+#;
+
+#;
+# Warning: every list except $leader must be the same length;
+
+# Server part;
+hinst=(mana1 mana2 mana3) # The machines the host containers run on ;
+a=(10.0.1.217 10.0.2.109 10.0.3.215) # The machines's corresponding IPs;
+hosts=(consul1 consul2 consul3) # Consul container names;
+swarm=(swarm1 swarm2 swarm3) # Swarm container names;
+leader=($hosts(1) $a(1)) # Leader server name and IP;
+
+# Client part;
+cinst=(prod1 prod2 prod3) # The machines the clients run on;
+c=(10.0.1.151 10.0.2.85 10.0.3.138) # Their IP addresses;
+clients=(client1 client2 client3) # Client container names;
+
+# Docker bridge IP on each machine
+bips=(172.17.42.1 172.17.42.1 172.17.42.1);
+
+# Ports used by consul
+tcp=(8300 8301 8302 8400 8500);
+udp=(8301 8302);
+
+# Prefix before each command is printed
+prefix='ssh -u ubuntu -d /gotools/a0.pem -s';
+
+echo '';
+echo '#';
+echo '# Create the consul discovery service & swarm managers';
+
+suffix='-bootstrap-expect '^$#hosts;
+for (x in `{seq 1 $#a}){
+   h=$hosts($x);
+   s=$swarm($x);
+   ip=$a($x);
+   p=();
+   for (i in $tcp){
+      p=($p $ip:$i:$i);
+   };
+   for (i in $udp){
+      p=($p $ip:$i:$i/udp);
+   };
+   p=($p $bips(1)^:53:53/udp);
+   echo '';
+   echo '#' $hinst($x): $h/$s;
+   echo '#' $prefix $hinst($x) sudo docker rm -f $h $s '#Removes old containers' ;
+   echo $prefix $hinst($x) sudo docker run --restart always -d -h $h --name $h -v /mnt:/data '-p '^$p consul agent -advertise $a($x) -server $suffix;
+   echo $prefix $hinst($x) sudo docker run --restart always -d -h $s --name $s -p 3375:2375 swarm manage --replication --advertise $ip:3375 consul://^$leader(2)^:8500/;
+   suffix='-join '^$leader(2);
+};
+
+echo '';
+echo '#';
+echo '#' Create client proxies;
+for (x in `{seq 1 $#c}){
+   h=$clients($x);
+   ip=$c($x);
+   p=();
+   for (i in $tcp){
+      p=($p $i:$i);
+   };
+   for (i in $udp){
+      p=($p $i:$i/udp);
+   };
+   echo '';
+   echo '#' $cinst($x): $h/join;
+   echo '#' $prefix $cinst($x) sudo docker rm -f $h join '# Removes old containers';
+   echo $prefix $cinst($x) sudo docker run --restart always -d -h $h --name $h '-p '^$p consul agent -rejoin -advertise $c($x) -join $leader(2);
+   echo $prefix $cinst($x) sudo docker run --restart always -d -h join --name join swarm join --advertise $ip:2375 consul://$ip:8500/;
+};
