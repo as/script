@@ -70,7 +70,8 @@ for (x in `{seq 1 $#c}){
    };
    echo '';
    echo '#' $cinst($x): $h/join;
-   echo '#' $prefix $cinst($x) sudo docker rm -f $h join '# Removes old containers';
+   echo '#' $prefix $cinst($x) sudo docker rm -f $h join reg'# Removes old containers';
    echo $prefix $cinst($x) sudo docker run --restart always -d -h $h --name $h '-p '^$p consul agent -rejoin -advertise $c($x) -join $leader(2);
    echo $prefix $cinst($x) sudo docker run --restart always -d -h join --name join swarm join --advertise $ip:2375 consul://$ip:8500/;
+   echo $prefix $cinst($x) sudo docker run --restart always -d --name reg -h reg -v /var/run/docker.sock:/tmp/docker.sock gliderlabs/registrator:latest consul://^$leader(2)^:8500
 };
