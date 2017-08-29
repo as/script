@@ -1,4 +1,7 @@
 #!/bin/rc
+#
+# Note: The latest docker has built in RAFT, you probably don't need this
+#
 # This rc script generates commands to create an N-node raft consensus quorum;
 # along with a fault tolerant docker swarm. Feel free to use or modify this script;
 # if you know what you're doing. It assumes an internal network not exposed to the;
